@@ -64,6 +64,7 @@ end
 y = y(:);
 y(isnan(y)) = nanmean(y);
 nobs = length(y);
+justTest =1;
 
 % Load dates
 if isempty(yDates)
