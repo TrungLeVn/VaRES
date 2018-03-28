@@ -334,6 +334,7 @@ for r = 1:nsim
     else
     XSim = [];
     end
+    [ySim,~,~] = GetSim(estParams,model,FirstY,XSim,FirstCondQ,FirstCondES,residSim);
     muSim = ySim - armaxerrors(meanPars,ar,ma,constant,ySim,[],m,ones(size(ySim)));
     muSim(1) = mean(ySim);
     paramSim(:,r) = fminsearch(@(params) ALdist2(params,muSim,ySim,XSim,theta,model,empiricalQuantile),estParams,options);
