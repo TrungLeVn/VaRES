@@ -319,7 +319,7 @@ exitFlag = SortedFval(1,2);
 % Bootstrap standard errors
 if getse
 fprintf('Getting standard errors... \n');
-nsim = 100;
+nsim = 200;
 resid = (yLowFreq - condQuantile)./abs(condQuantile);
 paramSim = zeros(length(estParams),nsim);
 if doparallel
@@ -340,11 +340,18 @@ for r = 1:nsim
 end
 end
 se = std(paramSim,0,2);
-zstat = estParams ./ se;
+%zstat = estParams ./ se;
 %pval = 0.5 * erfc(0.7071 * abs(zstat)) * 2;
 %pval(pval<1e-6) = 0;
+if beta2para
+    hypothesis = [0;0;1;1];
+else
+    hypothesis = [0;0;1];
+end
+% Hypothesis that the betaLags is not equal to 1, which mean equally
+% weighted (i.e., no point of using MIDAS lags);
 meanParamSim = repmat(mean(paramSim,2),1,nsim);
-pval =  mean(abs(paramSim - meanParamSim) > repmat(abs(estParams),1,nsim),2);
+pval =  mean(abs(paramSim - meanParamSim + hypothesis) > repmat(abs(estParams),1,nsim),2);
 else
 se = nan(length(estParams),1); 
 zstat = nan(length(estParams),1); 
@@ -550,7 +557,7 @@ weights = midasBetaWeights(nlag,k1,k2)';
 condQuantile = intercept + slope .* (X * weights);
 % Asymmetric loss function
 loss = y - condQuantile;
-fval = loss' * (q - (loss<0));
+fval = loss' * (q - (loss<=0));
 end
 
 
