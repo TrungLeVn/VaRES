@@ -231,8 +231,8 @@ betaIni = startPars';
 end
 fprintf('Optimizing parameters.... \n');
 % Optimization options
-MaxFunEvals = 3000; % Increase in case the model is hard to converge
-MaxIter = 3000;
+MaxFunEvals = 4000; % Increase in case the model is hard to converge
+MaxIter = 4000;
 
 if isempty(options)
     if ~searchFlag
@@ -316,7 +316,7 @@ exitFlag = SortedFval(1,2);
 if getse
 fprintf('Getting standard errors... \n');
 nsim = 200;
-resid = (yLowFreq - condQuantile)./abs(condQuantile);
+resid = (yLowFreq - condQuantile);
 paramSim = zeros(length(estParams),nsim);
 if doparallel
 parfor r = 1:nsim
@@ -324,7 +324,8 @@ parfor r = 1:nsim
     residSim = resid(ind);
     %xHighFreqSim = xHighFreq(ind,:);
     %yHighOriSim = yHighOri(ind,:);
-    [yLowFreqSim,~] = GetSim(estParams,yHighOri,xHighFreq,beta2para,residSim);
+    %[yLowFreqSim,~] = GetSim(estParams,yHighOri,xHighFreq,beta2para,residSim);
+    yLowFreqSim = condQuantile + residSim; 
     paramSim(:,r) = fminsearch(@(params) objFun(params,yLowFreqSim,yHighOri,xHighFreqSim,q,beta2para),estParams,options);
 end
 else
@@ -333,7 +334,8 @@ for r = 1:nsim
     residSim = resid(ind); 
     %xHighFreqSim = xHighFreq(ind,:);
     %yHighOriSim = yHighOri(ind,:);
-    [yLowFreqSim,~] = GetSim(estParams,yHighOri,xHighFreq,beta2para,residSim);
+    %[yLowFreqSim,~] = GetSim(estParams,yHighOri,xHighFreq,beta2para,residSim);
+    yLowFreqSim = condQuantile + residSim; 
     paramSim(:,r) = fminsearch(@(params) objFun(params,yLowFreqSim,yHighOri,xHighFreq,q,beta2para),estParams,options);
 end
 end
@@ -352,18 +354,17 @@ meanParamSim = repmat(mean(paramSim,2),1,nsim);
 pval =  mean(abs(paramSim - meanParamSim + hypothesis) > repmat(abs(estParams),1,nsim),2);
 else
 se = nan(length(estParams),1); 
-zstat = nan(length(estParams),1); 
 pval = nan(length(estParams),1);
 end
 %%
 % Display the estimation results
-columnNames = {'Coeff','StdErr','tStat','Prob'};
+columnNames = {'Coeff','StdErr','Prob'};
 if beta2para
   rowNames = {'Intercept';'Slope(+)';'Slope(-)';'k1';'k2'};
 else
   rowNames = {'Intercept';'Slope(+)';'Slope(-)';'k2'};
 end
-    TableEst = table(estParams,se,zstat,pval,'RowNames',rowNames,'VariableNames',columnNames);
+    TableEst = table(estParams,se,pval,'RowNames',rowNames,'VariableNames',columnNames);
 if display
 if ~searchFlag && ~autodiffFlag
     fprintf('Method: Asymmetric loss function minimization\n');

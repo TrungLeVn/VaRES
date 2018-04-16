@@ -320,14 +320,14 @@ exitFlag = SortedFval(1,2);
 if getse
 fprintf('Getting standard errors... \n');
 nsim = 200;
-resid = (yLowFreq - condQuantile)./abs(condQuantile);
+resid = (yLowFreq - condQuantile);
 paramSim = zeros(length(estParams),nsim);
 if doparallel
 parfor r = 1:nsim
     ind = randi(nobsEst,[nobsEst,1]);
     residSim = resid(ind);
-    %xHighFreqSim = xHighFreq(ind,:);
-    [yLowFreqSim,~] = GetSim(estParams,xHighFreq,beta2para,residSim);
+    yLowFreqSim = condQuantile + resid(ind);
+   % [yLowFreqSim,~] = GetSim(estParams,xHighFreq,beta2para,residSim);
     paramSim(:,r) = fminsearch(@(params) objFun(params,yLowFreqSim,xHighFreq,q,beta2para),estParams,options);
 end
 else
@@ -335,8 +335,9 @@ for r = 1:nsim
     ind = randi(nobsEst,[nobsEst,1]);
     residSim = resid(ind); 
     %xHighFreqSim = xHighFreq(ind,:);
-    [yLowFreqSim,~] = GetSim(estParams,xHighFreq,beta2para,residSim);
-    paramSim(:,r) = fminsearch(@(params) objFun(params,yLowFreqSim,xHighFreq,q,beta2para),estParams,options);
+    yLowFreqSim = condQuantile + resid(ind);
+   % [yLowFreqSim,~] = GetSim(estParams,xHighFreq,beta2para,residSim);
+      paramSim(:,r) = fminsearch(@(params) objFun(params,yLowFreqSim,xHighFreq,q,beta2para),estParams,options);
 end
 end
 se = std(paramSim,0,2);
@@ -359,13 +360,13 @@ pval = nan(length(estParams),1);
 end
 %%
 % Display the estimation results
-columnNames = {'Coeff','StdErr','tStat','Prob'};
+columnNames = {'Coeff','StdErr','Prob'};
 if beta2para
    rowNames = {'Intercept';'Slope';'k1';'k2'};
 else
    rowNames = {'Intercept';'Slope';'k2'};
 end
-    TableEst = table(estParams,se,zstat,pval,'RowNames',rowNames,'VariableNames',columnNames);
+    TableEst = table(estParams,se,pval,'RowNames',rowNames,'VariableNames',columnNames);
 if display
 if ~searchFlag 
     fprintf('Method: Asymmetric loss function minimization, Analytic gradient Newton iterations\n');

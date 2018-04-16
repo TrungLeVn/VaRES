@@ -5,7 +5,7 @@ quantileDefault = 0.05;
 periodDefault = 1;
 nlagDefault = 100;
 callerName = 'VarEs_MidasAS';
-meanSpecDefault = [1,1,0];
+arSpecDefault = 1;
 parseObj = inputParser;
 addParameter(parseObj,'Quantile',quantileDefault,@(x)validateattributes(x,{'numeric'},{'scalar','>',0,'<',1},callerName));
 addParameter(parseObj,'X',[],@(x)validateattributes(x,{'numeric'},{'2d'},callerName));
@@ -25,7 +25,7 @@ addParameter(parseObj,'Options',[],@(x)validateattributes(x,{},{},callerName));
 addParameter(parseObj,'Params',[],@(x)validateattributes(x,{'numeric'},{'column'},callerName));
 addParameter(parseObj,'Constrained',true,@(x)validateattributes(x,{'numeric','logical'},{'binary','nonempty'},callerName));
 addParameter(parseObj,'startPars',[]);
-addParameter(parseObj,'armaSpec',meanSpecDefault);
+addParameter(parseObj,'armaSpec',arSpecDefault);
 
 parse(parseObj,varargin{:});
 q = parseObj.Results.Quantile;
@@ -46,7 +46,7 @@ display = parseObj.Results.Display;
 estParams = parseObj.Results.Params;
 startPars = parseObj.Results.startPars;
 constrained = parseObj.Results.Constrained;
-armaSpec  = parseObj.Results.armaSpec;
+arSpec  = parseObj.Results.armaSpec;
 
 % Replace missing values by the sample average
 
@@ -115,42 +115,16 @@ xDates = MixedData.EstXdate;
 nobsEst = size(yLowFreq,1);
 
 % Estimating the Conditional Mean
-constant = armaSpec(1);
-ar = armaSpec(2);
-if ar > 1
-    arEst = 1:ar; 
-else
-    arEst = ar;
-end
-ma = armaSpec(3);
-if ma > 1
-    maEst = 1:ma;
-else
-    maEst = ma;
-end
-
-m = max(ar,ma);
+constant = 1; 
 if isempty(estParams)
     if isempty(startPars)
-        [meanEst,~,~,~,~,meanOutput] = armaxfilter(yLowFreq,constant,arEst,maEst);
+        [meanEst,~,~,~,~,meanOutput] = armaxfilter(yLowFreq,constant,arSpec,0);
     else
-        [meanEst,~,~,~,~,meanOutput] =  armaxfilter(yLowFreq,constant,arEst,maEst,[],startPars(1:sum(armaSpec)));
+        [meanEst,~,~,~,~,meanOutput] =  armaxfilter(yLowFreq,constant,arSpec,0,[],startPars(1:sum(arSpec)));
     end
-    if constant == 0
-    meanPars = [0;meanEst];
-    else
-    meanPars = meanEst;
-    end
-    if ar == 0 
-    meanPars = [meanPars(1);0;meanPars(2:end)];
-    end
-    if ma == 0 
-    meanPars = [meanPars;0];
-    end
-    mu = yLowFreq - armaxerrors(meanPars,arEst,maEst,constant,yLowFreq,[],m,ones(size(yLowFreq)));
-    mu(1) = mean(yLowFreq);
+    mu = yLowFreq - armaxerrors([meanEst;0],1:arSpec,0,constant,yLowFreq,[],arSpec,ones(size(yLowFreq)));
+    mu(1:arSpec) = repmat(mean(yLowFreq),arSpec,1);
 end
-
 %%
 % In case of known parameters, just compute conditional quantile/ES and exit.
 if ~isempty(estParams)
@@ -190,7 +164,7 @@ if isempty(startPars)
     fprintf('Finding the initial Betas for VaREs... \n');
     betaIni = IniParAL2(mu,QuantEst,yLowFreq,yHighOri,xHighFreq,q,beta2para,numInitialsRand,numInitials,doparallel);
 else
-    betaIni = startPars(sum(armaSpec)+1:end)';
+    betaIni = startPars(arSpec+2:end)';
 end
 % Bounds for numerical optimization in case use fmincon
 fprintf('Optimizing parameters.... \n');
@@ -273,7 +247,7 @@ exitFlag = SortedFval(1,2);
 %Get standard errors using the simulation approach
 if getse
 fprintf('Getting standard errors... \n');
-nsim = 100;
+nsim = 200;
 resid = (yLowFreq - CondQ)./abs(CondQ);
 paramSim = zeros(length(estParams),nsim);
 if doparallel
@@ -282,9 +256,7 @@ parfor r = 1:nsim
     residSim = resid(ind);
     %xHighFreqSim = xHighFreq(ind,:);
     %yHighOriSim = yHighOri(ind,:);
-    [yLowFreqSim,~,~] = GetSim(estParams,yHighOri,xHighFreq,beta2para,residSim);
-    muSim = yLowFreqSim - armaxerrors(meanPars,ar,ma,constant,yLowFreqSim,[],m,ones(size(yLowFreqSim)));
-    muSim(1) = mean(yLowFreqSim);
+    [yLowFreqSim,muSim] = GetSim(estParams,meanEst,arSpec,yHighOri,xHighFreq,beta2para,residSim);
     paramSim(:,r) = fminsearch(@(params) ALdist2(params,muSim,yLowFreqSim,yHighOri,xHighFreq,q,beta2para),estParams,options);
 end
 else
@@ -293,32 +265,34 @@ for r = 1:nsim
     residSim = resid(ind);
     %xHighFreqSim = xHighFreq(ind,:);
     %yHighOriSim = yHighOri(ind,:);
-    [yLowFreqSim,~,~] = GetSim(estParams,yHighOri,xHighFreq,beta2para,residSim);
-    muSim = yLowFreqSim - armaxerrors(meanPars,ar,ma,constant,yLowFreqSim,[],m,ones(size(yLowFreqSim)));
-    muSim(1) = mean(yLowFreqSim);
+    [yLowFreqSim,muSim] = GetSim(estParams,meanEst,arSpec,yHighOri,xHighFreq,beta2para,residSim);
     paramSim(:,r) = fminsearch(@(params) ALdist2(params,muSim,yLowFreqSim,yHighOri,xHighFreq,q,beta2para),estParams,options);
 end
 end
 se = std(paramSim,0,2);
-zstat = estParams ./ se;
+if beta2para
+    hypothesis = [0;0;0;1;1;0];
+else
+    hypothesis = [0;0;0;1;0];
+end
+% Hypothesis that the betaLags is not equal to 1, which mean equally
+% weighted (i.e., no point of using MIDAS lags);
 meanParamSim = repmat(mean(paramSim,2),1,nsim);
-pval =  mean(abs(paramSim - meanParamSim) > repmat(abs(estParams),1,nsim),2);
+pval =  mean(abs(paramSim - meanParamSim + hypothesis) > repmat(abs(estParams),1,nsim),2);
 else
 se = nan(length(estParams),1); 
 pval = nan(length(estParams),1);
 zstat = nan(length(estParams),1);
 end
 meanSe = meanOutput.CoefStdErr;
-meanTstat = meanOutput.tstat;
 meanPval = meanOutput.CoefPval;
 estParams = [meanEst;estParams];
 se = [meanSe;se];
-zstat = [meanTstat;zstat];
 pval = [meanPval;pval];
 %%
 % Get all estimation table
-columnNames = {'Coeff','StdErr','tStat','Prob'};
-    TableEst = table(estParams,se,zstat,pval,'VariableNames',columnNames);
+columnNames = {'Coeff','StdErr','Prob'};
+    TableEst = table(estParams,se,pval,'VariableNames',columnNames);
 if display
     if exist('patternsearch','file') ~= 0        
         fprintf('Method: Asymmetric loss function minimization, Pattern search\n');
@@ -509,7 +483,7 @@ end
 %-------------------------------------------------------------------------
 % Local function: Compute the yLowFreqSim
 
-function [yLowFreqSim,CondQsim,CondESsim] = GetSim(params,yHighOriSim,xHighFreqSim,beta2para,ResidSim)
+function [yLowFreqSim,muSim] = GetSim(params,meanEst,arSpec,yHighOriSim,xHighFreqSim,beta2para,ResidSim)
 % Allocate the parameters
 intercept = params(1);
 slope1 = params(2);
@@ -539,4 +513,10 @@ yLowFreqSim = CondQsim + abs(CondQsim).*ResidSim;
 Exceed = find(yLowFreqSim <= CondQsim);
 ESsimMean = mean(ResidSim(ResidSim<0));
 yLowFreqSim(Exceed,:) = CondQsim(Exceed) + (1/ESsimMean).*ResidSim(Exceed).*(CondESsim(Exceed)-CondQsim(Exceed));
+muSim = repmat(meanEst(1),size(yLowFreqSim,1),1); 
+if arSpec > 0 
+for i = (arSpec+1):size(yLowFreqSim,1)
+    muSim(i) = muSim(i) + meanEst(2:end).*yLowFreqSim(i-1:-1:i-arSpec);
+end
+end
 end
