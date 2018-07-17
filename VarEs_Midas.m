@@ -17,7 +17,7 @@ addParameter(parseObj,'Ovlap',false,@(x)validateattributes(x,{'numeric','logical
 addParameter(parseObj,'DoParallel',false,@(x)validateattributes(x,{'numeric','logical'},{'binary','nonempty'},callerName));
 addParameter(parseObj,'Cores',4,@(x)validateattributes(x,{'numeric'},{'scalar','integer','positive'},callerName));
 addParameter(parseObj,'numInitials',10,@(x)validateattributes(x,{'numeric'},{'scalar','integer','positive'},callerName));
-addParameter(parseObj,'numInitialsRand',100000,@(x)validateattributes(x,{'numeric'},{'scalar','integer','positive'},callerName));
+addParameter(parseObj,'numInitialsRand',20000,@(x)validateattributes(x,{'numeric'},{'scalar','integer','positive'},callerName));
 addParameter(parseObj,'Beta2Para',false,@(x)validateattributes(x,{'numeric','logical'},{'binary','nonempty'},callerName));
 addParameter(parseObj,'GetSe',true,@(x)validateattributes(x,{'numeric','logical'},{'binary','nonempty'},callerName));
 addParameter(parseObj,'Display',false,@(x)validateattributes(x,{'numeric','logical'},{'binary','nonempty'},callerName));
@@ -117,7 +117,7 @@ yDates = MixedData.EstYdate;
 xDates = MixedData.EstXdate;
 nobsEst = size(yLowFreq,1);
 
-% Estimating the Conditional Mean
+% Estimating the Conditional Mean of the low-frequency variable
 constant = 1; 
 if isempty(estParams)
     if isempty(startPars)
@@ -284,7 +284,6 @@ pval =  mean(abs(paramSim - meanParamSim + hypothesis) > repmat(abs(estParams),1
 else
 se = nan(length(estParams),1); 
 pval = nan(length(estParams),1);
-zstat = nan(length(estParams),1);
 end
 meanSe = meanOutput.CoefStdErr;
 meanPval = meanOutput.CoefPval;
@@ -476,7 +475,7 @@ end
 %-------------------------------------------------------------------------
 % Local function: Compute the yLowFreqSim
 
-function [yLowFreqSim,CondQsim,CondESsim] = GetSim(params,meanEst,arSpec,xHighFreqSim,beta2para,ResidSim)
+function [yLowFreqSim,muSim,CondQsim,CondESsim] = GetSim(params,meanEst,arSpec,xHighFreqSim,beta2para,ResidSim)
 % Allocate the parameters
 intercept = params(1);
 slope = params(2);

@@ -17,7 +17,7 @@ addParameter(parseObj,'Ovlap',false,@(x)validateattributes(x,{'numeric','logical
 addParameter(parseObj,'DoParallel',false,@(x)validateattributes(x,{'numeric','logical'},{'binary','nonempty'},callerName));
 addParameter(parseObj,'Cores',4,@(x)validateattributes(x,{'numeric'},{'scalar','integer','positive'},callerName));
 addParameter(parseObj,'numInitials',10,@(x)validateattributes(x,{'numeric'},{'scalar','integer','positive'},callerName));
-addParameter(parseObj,'numInitialsRand',100000,@(x)validateattributes(x,{'numeric'},{'scalar','integer','positive'},callerName));
+addParameter(parseObj,'numInitialsRand',20000,@(x)validateattributes(x,{'numeric'},{'scalar','integer','positive'},callerName));
 addParameter(parseObj,'Beta2Para',false,@(x)validateattributes(x,{'numeric','logical'},{'binary','nonempty'},callerName));
 addParameter(parseObj,'GetSe',true,@(x)validateattributes(x,{'numeric','logical'},{'binary','nonempty'},callerName));
 addParameter(parseObj,'Display',false,@(x)validateattributes(x,{'numeric','logical'},{'binary','nonempty'},callerName));
@@ -98,7 +98,7 @@ end
 if isempty(estParams)&&isempty(startPars)
     fprintf('Estimating univariate MidasQuantile... \n');
     QuantEst = MidasQuantileAS(y,'Dates',yDates,'X',Regressor','xDates',xDates,'Period',period','NumLags',nlag,...
-    'Ovlap',ovlap,'GetSe',false,'Display',false,'DoParallel',doparallel,'Quantile',q,'Constrained',constrained);
+    'Ovlap',ovlap,'GetSe',false,'Display',false,'DoParallel',doparallel,'Quantile',q,'Constrained',constrained,'Beta2Para',beta2para);
 end
 %%
 % Prepare data for the LHS and RHS of the quantile regression

@@ -114,8 +114,8 @@ addParameter(parseObj,'xDates',[],@(x)validateattributes(x,{'numeric','cell'},{}
 addParameter(parseObj,'Ovlap',false,@(x)validateattributes(x,{'numeric','logical'},{'binary','nonempty'},callerName));
 addParameter(parseObj,'DoParallel',false,@(x)validateattributes(x,{'numeric','logical'},{'binary','nonempty'},callerName));
 addParameter(parseObj,'Cores',4,@(x)validateattributes(x,{'numeric'},{'scalar','integer','positive'},callerName));
-addParameter(parseObj,'numInitials',10,@(x)validateattributes(x,{'numeric'},{'scalar','integer','positive'},callerName));
-addParameter(parseObj,'numInitialsRand',100000,@(x)validateattributes(x,{'numeric'},{'scalar','integer','positive'},callerName));
+addParameter(parseObj,'numInitials',5,@(x)validateattributes(x,{'numeric'},{'scalar','integer','positive'},callerName));
+addParameter(parseObj,'numInitialsRand',20000,@(x)validateattributes(x,{'numeric'},{'scalar','integer','positive'},callerName));
 addParameter(parseObj,'Beta2Para',false,@(x)validateattributes(x,{'numeric','logical'},{'binary','nonempty'},callerName));
 addParameter(parseObj,'GetSe',true,@(x)validateattributes(x,{'numeric','logical'},{'binary','nonempty'},callerName));
 addParameter(parseObj,'Display',true,@(x)validateattributes(x,{'numeric','logical'},{'binary','nonempty'},callerName));
@@ -231,8 +231,8 @@ betaIni = startPars';
 end
 fprintf('Optimizing parameters.... \n');
 % Optimization options
-MaxFunEvals = 4000; % Increase in case the model is hard to converge
-MaxIter = 4000;
+MaxFunEvals = 2000; % Increase in case the model is hard to converge
+MaxIter = 2000;
 
 if isempty(options)
     if ~searchFlag
@@ -255,7 +255,7 @@ optionCon = optimoptions('fmincon', 'MaxFunEvals', MaxFunEvals, ...
     ub = [Inf;Inf;Inf;200-tol;200-tol];
     end
 
-REP = 10; %Number of time the argorithm will be restarted.
+REP = 5; %Number of time the argorithm will be restarted.
 % Numeric minimization
 estParams = zeros(size(betaIni));
 fval = zeros(size(betaIni,1),1);

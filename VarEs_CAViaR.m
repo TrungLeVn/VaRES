@@ -5,7 +5,7 @@ quantileDefault = 0.05;
 periodDefault = 1;
 nlagDefault = 0;
 callerName = 'VarEs_CAViaR';
-meanSpecDefault = [1,1,0];
+arSpecDefault = 1;
 parseObj = inputParser;
 addParameter(parseObj,'Quantile',quantileDefault,@(x)validateattributes(x,{'numeric'},{'scalar','>',0,'<',1},callerName));
 addParameter(parseObj,'X',[],@(x)validateattributes(x,{'numeric'},{'2d'},callerName));
@@ -17,7 +17,7 @@ addParameter(parseObj,'xDates',[],@(x)validateattributes(x,{'numeric','cell'},{}
 addParameter(parseObj,'DoParallel',false,@(x)validateattributes(x,{'numeric','logical'},{'binary','nonempty'},callerName));
 addParameter(parseObj,'Cores',4,@(x)validateattributes(x,{'numeric'},{'scalar','integer','positive'},callerName));
 addParameter(parseObj,'numInitials',10,@(x)validateattributes(x,{'numeric'},{'scalar','integer','positive'},callerName));
-addParameter(parseObj,'numInitialsRand',100000,@(x)validateattributes(x,{'numeric'},{'scalar','integer','positive'},callerName));
+addParameter(parseObj,'numInitialsRand',50000,@(x)validateattributes(x,{'numeric'},{'scalar','integer','positive'},callerName));
 addParameter(parseObj,'GetSe',true,@(x)validateattributes(x,{'numeric','logical'},{'binary','nonempty'},callerName));
 addParameter(parseObj,'Display',false,@(x)validateattributes(x,{'numeric','logical'},{'binary','nonempty'},callerName));
 addParameter(parseObj,'Options',[],@(x)validateattributes(x,{},{},callerName));
@@ -25,7 +25,7 @@ addParameter(parseObj,'Params',[],@(x)validateattributes(x,{'numeric'},{'column'
 addParameter(parseObj,'Constrained',true,@(x)validateattributes(x,{'numeric','logical'},{'binary','nonempty'},callerName));
 addParameter(parseObj,'EmpQuant',[],@(x)validateattributes(x,{'numeric'},{'scalar'},callerName));
 addParameter(parseObj,'startPars',[]);
-addParameter(parseObj,'armaSpec',meanSpecDefault);
+addParameter(parseObj,'armaSpec',arSpecDefault);
 
 parse(parseObj,varargin{:});
 theta = parseObj.Results.Quantile;
@@ -45,7 +45,7 @@ BetaHat = parseObj.Results.Params;
 xDates = parseObj.Results.xDates;
 constrained = parseObj.Results.Constrained;
 empiricalQuantile = parseObj.Results.EmpQuant;
-armaSpec  = parseObj.Results.armaSpec;
+arSpec  = parseObj.Results.armaSpec;
 startPars = parseObj.Results.startPars;
 
 if ~ismember(model,[1,2])
@@ -88,9 +88,9 @@ end
 % Mix data according to the return horizon and nlag 
 ovlap = false; 
 MixedData = MixedFreqQuantile(y,yDates,y,yDates,nlag,period,ovlap);
-y = MixedData.EstY;
+yLowFreq = MixedData.EstY;
 yDates = MixedData.EstYdate;
-nobs = size(y,1);
+nobs = size(yLowFreq,1);
 % Load the conditioning variable (predictor): At the moment, just allow
 % Regressor to be daily variance-type value
 if ~isempty(Regressor)
@@ -108,55 +108,26 @@ if isempty(empiricalQuantile)
    else
        InitialEmp = 50;
    end
-   ysort          = sortrows(y(1:InitialEmp), 1); 
+   ysort          = sortrows(yLowFreq(1:InitialEmp), 1); 
    %empiricalQuantile = ysort(round(InitialEmp*theta));
    empiricalQuantile = quantile(ysort,theta);
 end
 %%
 % Get the arma specification
-% Estimating the Conditional Mean
-constant = armaSpec(1);
-ar = armaSpec(2);
-if ar > 1
-    arEst = 1:ar; 
-else
-    arEst = ar;
-end
-ma = armaSpec(3);
-if ma > 1
-    maEst = 1:ma;
-else
-    maEst = ma;
-end
-
-m = max(ar,ma);
-
-%%
-% Estimating conditional mean, if needed
+constant = 1; 
 if isempty(BetaHat)
     if isempty(startPars)
-        [meanEst,~,~,~,~,meanOutput] = armaxfilter(y,constant,arEst,maEst);
+        [meanEst,~,~,~,~,meanOutput] = armaxfilter(yLowFreq,constant,arSpec,0);
     else
-        [meanEst,~,~,~,~,meanOutput] =  armaxfilter(y,constant,arEst,maEst,[],startPars(1:sum(armaSpec)));
+        [meanEst,~,~,~,~,meanOutput] =  armaxfilter(yLowFreq,constant,arSpec,0,[],startPars(1:sum(arSpec)));
     end
-    if constant == 0
-    meanPars = [0;meanEst];
-    else
-    meanPars = meanEst;
-    end
-    if ar == 0 
-    meanPars = [meanPars(1);0;meanPars(2:end)];
-    end
-    if ma == 0 
-    meanPars = [meanPars;0];
-    end
-    mu = y - armaxerrors(meanPars,arEst,maEst,constant,y,[],m,ones(size(y)));
-    mu(1) = mean(y);
+    mu = yLowFreq - armaxerrors([meanEst;0],1:arSpec,0,constant,yLowFreq,[],arSpec,ones(size(yLowFreq)));
+    mu(1:arSpec) = repmat(mean(yLowFreq),arSpec,1);
 end
-
+%%
 % In case of known parameters, just compute conditional quantile/ES and exit.
 if ~isempty(BetaHat)
-     meanEst = BetaHat(1:sum(armaSpec));
+     meanEst = BetaHat(1:sum(arSpec));
     if constant == 0
     meanPars = [0;meanEst];
     else
@@ -168,17 +139,17 @@ if ~isempty(BetaHat)
     if ma == 0 
     meanPars = [meanPars;0];
     end
-    varPars = BetaHat(sum(armaSpec)+1:end);
-    mu = y - armaxerrors(meanPars,arEst,maEst,constant,y,[],m,ones(size(y)));
-    mu(1) = mean(y);
-    [~,CondQ,CondES] = ALdist2(varPars,mu,y,Regressor,theta,model,empiricalQuantile);
+    varPars = BetaHat(sum(arSpec)+1:end);
+    mu = yLowFreq - armaxerrors(meanPars,arEst,maEst,constant,yLowFreq,[],m,ones(size(yLowFreq)));
+    mu(1) = mean(yLowFreq);
+    [~,CondQ,CondES] = ALdist2(varPars,mu,yLowFreq,Regressor,theta,model,empiricalQuantile);
     estParams = BetaHat;
-    Hit = theta - (y <= CondQ);
+    Hit = theta - (yLowFreq <= CondQ);
     HitPercentage    = mean(Hit(1:nobs) + theta) * 100;
     if nargout > 3
     output.estParams = estParams;
     output.quantile = theta;
-    output.y = y;
+    output.yLowFreq = yLowFreq;
     output.Hit = Hit;
     output.HitPercentage = HitPercentage;
     output.VaR = CondQ;
@@ -195,19 +166,19 @@ end
 % First get the parameter estimates of the quantile regression
     fprintf('Estimating univariate CAViaR estimate to get initial parameters\n');
     if ~isempty(Regressor)
-    QuantEst = CAViaR_X(y,'Dates',yDates,'X',Regressor','xDates',xDates,'Model',model,...
+    QuantEst = CAViaR_X(yLowFreq,'Dates',yDates,'X',Regressor','xDates',xDates,'Model',model,...
         'Display',false,'GetSe',false,'DoParallel',doparallel,'Cores',cores,...
         'DoFull',true,'Quantile',theta,'Constrained',constrained,'Period',period,...
         'NumLags',nlag);
     else
-    QuantEst = CAViaR_Uni(y,'Dates',yDates,'Model',model,...
+    QuantEst = CAViaR_Uni(yLowFreq,'Dates',yDates,'Model',model,...
         'Display',false,'GetSe',false,'DoParallel',doparallel,'Cores',cores,...
         'DoFull',true,'Quantile',theta,'Constrained',constrained,'Period',period,...
         'NumLags',nlag);
     end
 % Get the initial parameters for the AL distribution
 fprintf('Estimating initial parameters for VaREs\n');
-betaIni = IniParAL2(QuantEst,mu,y, Regressor, theta, empiricalQuantile,numInitialsRand,numInitials,model,doparallel);
+betaIni = IniParAL2(QuantEst,mu,yLowFreq, Regressor, theta, empiricalQuantile,numInitialsRand,numInitials,model,doparallel);
   else
       betaIni = startPars(sum(armaSpec)+1:end)';
   end
@@ -253,19 +224,19 @@ fval = zeros(size(betaIni,1),1);
 exitFlag = zeros(size(betaIni,1),1);
 if doparallel
 parfor i = 1:size(betaIni,1)
-    [estParams(i,:),fval(i,1),exitFlag(i,1)] = fminsearch(@(params) ALdist2(params,mu,y,Regressor,theta,model,empiricalQuantile),betaIni(i,:),options);        
-    %[estParams(i,:),fval(i,1),exitFlag(i,1)] = fminsearchbnd(@(params) ALdist2(params,mu,y,Regressor,theta,model,empiricalQuantile),betaIni(i,:),lb,ub,options);        
+    [estParams(i,:),fval(i,1),exitFlag(i,1)] = fminsearch(@(params) ALdist2(params,mu,yLowFreq,Regressor,theta,model,empiricalQuantile),betaIni(i,:),options);        
+    %[estParams(i,:),fval(i,1),exitFlag(i,1)] = fminsearchbnd(@(params) ALdist2(params,mu,yLowFreq,Regressor,theta,model,empiricalQuantile),betaIni(i,:),lb,ub,options);        
     for ii = 1:REP
     try
-    [estParams(i,:),fval(i,1),exitFlag(i,1)]  = fminunc(@(params) ALdist2(params,mu,y,Regressor,theta,model,empiricalQuantile),estParams(i,:),optionsUnc);
+    [estParams(i,:),fval(i,1),exitFlag(i,1)]  = fminunc(@(params) ALdist2(params,mu,yLowFreq,Regressor,theta,model,empiricalQuantile),estParams(i,:),optionsUnc);
     catch
     warning('fminunc does not work. Move on to the fminsearch.');
     end   
-        [estParams(i,:),fval(i,1),exitFlag(i,1)]  = fminsearch(@(params) ALdist2(params,mu,y,Regressor,theta,model,empiricalQuantile),estParams(i,:),options);
+        [estParams(i,:),fval(i,1),exitFlag(i,1)]  = fminsearch(@(params) ALdist2(params,mu,yLowFreq,Regressor,theta,model,empiricalQuantile),estParams(i,:),options);
     if constrained
-        %[estParams(i,:),fval(i,1),exitFlag(i,1)]  = fminsearchbnd(@(params) ALdist2(params,mu,y,Regressor,theta,model,empiricalQuantile),estParams(i,:),lb,ub,options);
+        %[estParams(i,:),fval(i,1),exitFlag(i,1)]  = fminsearchbnd(@(params) ALdist2(params,mu,yLowFreq,Regressor,theta,model,empiricalQuantile),estParams(i,:),lb,ub,options);
         if sum(estParams(i,:)' > lb) + sum(estParams(i,:)' < ub) ~= (2*length(estParams(i,:))) % If fminsearch violate the bounds, redo the optimization with fmincon
-           [estParams(i,:), fval(i,1), exitFlag(i,1)] = fmincon(@(params) ALdist2(params,mu,y,Regressor,theta,model,empiricalQuantile),estParams(i,:),[],[],[],[],lb,ub,[],optionCon);
+           [estParams(i,:), fval(i,1), exitFlag(i,1)] = fmincon(@(params) ALdist2(params,mu,yLowFreq,Regressor,theta,model,empiricalQuantile),estParams(i,:),[],[],[],[],lb,ub,[],optionCon);
        end
     end
        if exitFlag(i,1) == 1
@@ -275,40 +246,40 @@ parfor i = 1:size(betaIni,1)
 end
 else
 for i = 1:size(betaIni,1)
-    [estParams(i,:),fval(i,1),exitFlag(i,1)] = fminsearch(@(params) ALdist2(params,mu,y,Regressor,theta,model,empiricalQuantile),betaIni(i,:),options);        
-    %[estParams(i,:),fval(i,1),exitFlag(i,1)] = fminsearchbnd(@(params) ALdist2(params,mu,y,Regressor,theta,model,empiricalQuantile),betaIni(i,:),lb,ub,options);
+    [estParams(i,:),fval(i,1),exitFlag(i,1)] = fminsearch(@(params) ALdist2(params,mu,yLowFreq,Regressor,theta,model,empiricalQuantile),betaIni(i,:),options);        
+    %[estParams(i,:),fval(i,1),exitFlag(i,1)] = fminsearchbnd(@(params) ALdist2(params,mu,yLowFreq,Regressor,theta,model,empiricalQuantile),betaIni(i,:),lb,ub,options);        
     for ii = 1:REP
     try
-    [estParams(i,:),fval(i,1),exitFlag(i,1)]  = fminunc(@(params) ALdist2(params,mu,y,Regressor,theta,model,empiricalQuantile),estParams(i,:),optionsUnc);
+    [estParams(i,:),fval(i,1),exitFlag(i,1)]  = fminunc(@(params) ALdist2(params,mu,yLowFreq,Regressor,theta,model,empiricalQuantile),estParams(i,:),optionsUnc);
     catch
-    warning('fminunc does work. Move on to the fminsearch.');
-    end
-      [estParams(i,:),fval(i,1),exitFlag(i,1)]  = fminsearch(@(params) ALdist2(params,mu,y,Regressor,theta,model,empiricalQuantile),estParams(i,:),options);
+    warning('fminunc does not work. Move on to the fminsearch.');
+    end   
+        [estParams(i,:),fval(i,1),exitFlag(i,1)]  = fminsearch(@(params) ALdist2(params,mu,yLowFreq,Regressor,theta,model,empiricalQuantile),estParams(i,:),options);
     if constrained
-       %[estParams(i,:),fval(i,1),exitFlag(i,1)]  = fminsearchbnd(@(params) ALdist2(params,mu,y,Regressor,theta,model,empiricalQuantile),estParams(i,:),lb,ub,options);
-       if sum(estParams(i,:)' > lb) + sum(estParams(i,:)' < ub) ~= (2*length(estParams(i,:))) % If fminsearch violate the bounds, redo the optimization with fmincon
-          [estParams(i,:), fval(i,1), exitFlag(i,1)] = fmincon(@(params) ALdist2(params,mu,y,Regressor,theta,model,empiricalQuantile),estParams(i,:),[],[],[],[],lb,ub,[],optionCon);
+        %[estParams(i,:),fval(i,1),exitFlag(i,1)]  = fminsearchbnd(@(params) ALdist2(params,mu,yLowFreq,Regressor,theta,model,empiricalQuantile),estParams(i,:),lb,ub,options);
+        if sum(estParams(i,:)' > lb) + sum(estParams(i,:)' < ub) ~= (2*length(estParams(i,:))) % If fminsearch violate the bounds, redo the optimization with fmincon
+           [estParams(i,:), fval(i,1), exitFlag(i,1)] = fmincon(@(params) ALdist2(params,mu,yLowFreq,Regressor,theta,model,empiricalQuantile),estParams(i,:),[],[],[],[],lb,ub,[],optionCon);
        end
     end
        if exitFlag(i,1) == 1
           break
        end
     end
-end    
+end
 end
 SortedFval = sortrows([fval,exitFlag,estParams],1);
 estParams = SortedFval(1,3:size(SortedFval,2))';
 fval = SortedFval(1,1);
 exitFlag = SortedFval(1,2);
-[~,CondQ,CondES] = ALdist2(estParams,mu,y,Regressor,theta,model,empiricalQuantile);
+[~,CondQ,CondES] = ALdist2(estParams,mu,yLowFreq,Regressor,theta,model,empiricalQuantile);
 %%
 %Get standard errors using the simulation approach
 if getse
 fprintf('Calculating standard errors\n');
 nsim = 100;
-resid = (y - CondQ)./abs(CondQ);
+resid = (yLowFreq - CondQ)./abs(CondQ);
 paramSim = zeros(length(estParams),nsim);
-FirstY = y(1); 
+FirstY = yLowFreq(1); 
 FirstCondQ = CondQ(1); 
 FirstCondES = CondES(1);
 if doparallel
@@ -320,11 +291,9 @@ parfor r = 1:nsim
     else
     XSim = [];
     end
-    [ySim,~,~] = GetSim(estParams,model,FirstY,XSim,FirstCondQ,FirstCondES,residSim);
-    muSim = ySim - armaxerrors(meanPars,ar,ma,constant,ySim,[],m,ones(size(ySim)));
-    muSim(1) = mean(ySim);
+    [ySim,muSim] = GetSim(estParams,meanEst,arSpec,model,FirstY,XSim,FirstCondQ,FirstCondES,residSim);
     paramSim(:,r) = fminsearch(@(params) ALdist2(params,muSim,ySim,XSim,theta,model,empiricalQuantile),estParams,options);
-end
+end  
 else
 for r = 1:nsim
     ind = randi(nobs,[nobs,1]);
@@ -334,11 +303,9 @@ for r = 1:nsim
     else
     XSim = [];
     end
-    [ySim,~,~] = GetSim(estParams,model,FirstY,XSim,FirstCondQ,FirstCondES,residSim);
-    muSim = ySim - armaxerrors(meanPars,ar,ma,constant,ySim,[],m,ones(size(ySim)));
-    muSim(1) = mean(ySim);
+    [ySim,muSim] = GetSim(estParams,meanEst,arSpec,model,FirstY,XSim,FirstCondQ,FirstCondES,residSim);
     paramSim(:,r) = fminsearch(@(params) ALdist2(params,muSim,ySim,XSim,theta,model,empiricalQuantile),estParams,options);
-end    
+end
 end
 se = std(paramSim,0,2);
 zstat = estParams ./ se;
@@ -364,14 +331,14 @@ columnNames = {'Coeff','StdErr','tStat','Prob'};
     TableEst = table(estParams,se,zstat,pval,'VariableNames',columnNames);
 %%
 % Get the estimation output
-Hit = theta - (y <= CondQ);
+Hit = theta - (yLowFreq <= CondQ);
 HitPercentage    = mean(Hit(1:nobs) + theta) * 100;
 if nargout > 3
 output.estParams = estParams;
 output.se = se;
 output.quantile = theta;
 output.pval = pval;
-output.y = y;
+output.yLowFreq = yLowFreq;
 output.Hit = Hit;
 output.HitPercentage = HitPercentage;
 output.VaR = CondQ;
@@ -514,8 +481,8 @@ end
 
 %----------------------------------------------------------------------------------------
 % Local function to get simulated ySim - To be used to calculate the
-% standard errors, similar to to the Taylor(2017) paper;
-function [ySim,CondQsim,CondESsim] = GetSim(BetaHat,Model,FirstY,XSim,FirstCondQ,FirstCondES,ResidSim)
+% standard errors, similar to the Taylor(2017) paper;
+function [ySim,muSim,CondQsim,CondESsim] = GetSim(BetaHat,meanEst,arSpec,Model,FirstY,XSim,FirstCondQ,FirstCondES,ResidSim)
 nobs = length(ResidSim); 
 CondQsim = zeros(nobs,1);
 CondQsim(1) = FirstCondQ;
@@ -568,6 +535,12 @@ else
     ySim(t) = ySimDay;
     end  
   end
+end
+muSim = repmat(meanEst(1),size(ySim,1),1); 
+if arSpec > 0 
+for i = (arSpec+1):size(ySim,1)
+    muSim(i) = muSim(i) + meanEst(2:end).*ySim(i-1:-1:i-arSpec);
+end
 end
 end
 

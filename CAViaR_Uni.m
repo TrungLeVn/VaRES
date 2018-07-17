@@ -133,23 +133,23 @@ else
 % *****************************************************************************************
 % Set parameters for optimisation.
 % *****************************************************************************************
-REP			  = 15;                % Number of times the optimization algorithm is repeated.
+REP			  = 10;                % Number of times the optimization algorithm is repeated.
 if isempty(startPars)
 fprintf('Finding the initial Betas... \n');              % Number of times the optimization algorithm is repeated.
 if (model == 1)
-    nInitialVectors = [100000, 3]; % Number of initial vector fed in the uniform random number generator SAV and GARCH models.
-    nInitialCond = 20;             % Select the number of initial conditions for the optimisation.
+    nInitialVectors = [20000, 3]; % Number of initial vector fed in the uniform random number generator SAV and GARCH models.
+    nInitialCond = 10;             % Select the number of initial conditions for the optimisation.
     
 else
-    nInitialVectors = [100000, 4]; % Number of initial vector fed in the uniform random number generator for AS model.
-    nInitialCond = 20;            % Select the number of initial conditions for the optimisation.
+    nInitialVectors = [50000, 4]; % Number of initial vector fed in the uniform random number generator for AS model.
+    nInitialCond = 10;            % Select the number of initial conditions for the optimisation.
 end 
 end
 MaxFunEvals = 3000; % Parameters for the optimisation algorithm. Increase them in case the algorithm does not converge.
 MaxIter     = 3000;
 if isempty(options)
 options = optimset('LargeScale', 'off', 'HessUpdate','dfp', 'MaxFunEvals', MaxFunEvals, ...
-                    'display', 'off', 'MaxIter', MaxIter, 'TolFun', 1e-7, 'TolX', 1e-7);
+                    'display', 'off', 'MaxIter', MaxIter, 'TolFun', 1e-8, 'TolX', 1e-8);
 end
 
 % Some meaningful constrains for the paramters space - To be used in

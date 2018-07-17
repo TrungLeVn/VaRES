@@ -113,7 +113,7 @@ addParameter(parseObj,'Ovlap',false,@(x)validateattributes(x,{'numeric','logical
 addParameter(parseObj,'DoParallel',false,@(x)validateattributes(x,{'numeric','logical'},{'binary','nonempty'},callerName));
 addParameter(parseObj,'Cores',4,@(x)validateattributes(x,{'numeric'},{'scalar','integer','positive'},callerName));
 addParameter(parseObj,'numInitials',10,@(x)validateattributes(x,{'numeric'},{'scalar','integer','positive'},callerName));
-addParameter(parseObj,'numInitialsRand',100000,@(x)validateattributes(x,{'numeric'},{'scalar','integer','positive'},callerName));
+addParameter(parseObj,'numInitialsRand',20000,@(x)validateattributes(x,{'numeric'},{'scalar','integer','positive'},callerName));
 addParameter(parseObj,'Beta2Para',false,@(x)validateattributes(x,{'numeric','logical'},{'binary','nonempty'},callerName));
 addParameter(parseObj,'GetSe',true,@(x)validateattributes(x,{'numeric','logical'},{'binary','nonempty'},callerName));
 addParameter(parseObj,'Display',true,@(x)validateattributes(x,{'numeric','logical'},{'binary','nonempty'},callerName));
@@ -224,8 +224,8 @@ betaIni = startPars';
 end
 fprintf('Optimizing parameters.... \n');
 % Optimization options
-MaxFunEvals = 3000; % Increase if the model is not converged
-MaxIter = 3000;
+MaxFunEvals = 2000; % Increase if the model is not converged
+MaxIter = 2000;
 
 if isempty(options)
     if ~searchFlag
@@ -242,15 +242,15 @@ optionsUnc = optimoptions(@fminunc,'Display','off','Algorithm','quasi-newton',..
 tol = 1e-7;
 if ~beta2para
 lb = [-Inf;-Inf;1+tol];
-ub = [Inf;Inf;200-tol];
+ub = [Inf;Inf;300-tol];
 else
 lb = [-Inf;-Inf;1+tol;1+tol];
-ub = [Inf;Inf;200-tol;200-tol];
+ub = [Inf;Inf;300-tol;300-tol];
 end
 
 warning off
 
-REP = 10; % Number of times the argorithm is repeated 
+REP = 5; % Number of times the argorithm is repeated 
 % Numeric minimization
 estParams = zeros(size(betaIni));
 fval = zeros(size(betaIni,1),1);

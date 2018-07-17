@@ -23,6 +23,8 @@ addParameter(parseObj,'Constrained',true,@(x)validateattributes(x,{'numeric','lo
 addParameter(parseObj,'Threshold',0.075,@(x)validateattributes(x,{'numeric'},{'scalar'},callerName));
 addParameter(parseObj,'mu0',[],@(x)validateattributes(x,{'numeric'},{'scalar'},callerName));
 addParameter(parseObj,'startPars',[]);
+addParameter(parseObj,'Beta2Para',false,@(x)validateattributes(x,{'numeric','logical'},{'binary','nonempty'},callerName));
+
 
 parse(parseObj,varargin{:});
 theta = parseObj.Results.Quantile;
@@ -42,6 +44,7 @@ constrained = parseObj.Results.Constrained;
 threshold = parseObj.Results.Threshold;
 mu0 = parseObj.Results.mu0;
 startPars = parseObj.Results.startPars;
+beta2para = parseObj.Results.Beta2Para;
 
 if ~ismember(model,[1,2])
     disp(' ')
@@ -103,11 +106,11 @@ end
 if ~isempty(BetaHat)
     if ~isempty(Regressor)
    [~,CondQthreshold] = CAViaR_X(y,'Dates',yDates,'X',Regressor','xDates',xDates,'Model',submodel,'Quantile',threshold,...
-       'Display',false,'GetSe',false,'Params',BetaHat(1:(end-2)),'DoFull',true,'Constrained',constrained,...
+       'Display',false,'GetSe',getse,'Params',BetaHat(1:(end-2)),'DoFull',true,'Constrained',constrained,...
        'Period',period,'NumLags',nlag);
     else
     [~,CondQthreshold] = CAViaR_Uni(y,'Dates',yDates,'Model',submodel,'Quantile',threshold,...
-       'Display',false,'GetSe',false,'Params',BetaHat(1:(end-2)),'DoFull',true,'Constrained',constrained,...
+       'Display',false,'GetSe',getse,'Params',BetaHat(1:(end-2)),'DoFull',true,'Constrained',constrained,...
        'Period',period,'NumLags',nlag);
     end
     StdExceed = y./CondQthreshold - 1;
@@ -178,12 +181,12 @@ end
 if ~isempty(BetaHat)
 if submodel == 1
    [~,CondQthreshold,VaRoutput] = MidasQuantile(y,'Dates',yDates','X',Regressor,'Quantile',threshold,...
-       'xDates',xDates,'Display',false,'GetSe',false,'Params',BetaHat(1:(end-2)),...
-            'Ovlap',ovlap,'Period',period,'NumLags',nlag,'Constrained',constrained);
+       'xDates',xDates,'Display',false,'GetSe',getse,'Params',BetaHat(1:(end-2)),...
+            'Ovlap',ovlap,'Period',period,'NumLags',nlag,'Constrained',constrained,'Beta2Para',beta2para);
 else
     [~,CondQthreshold,VaRoutput] = MidasQuantileAS(y,'Dates',yDates','X',Regressor,'Quantile',threshold,...
-        'xDates',xDates,'Display',false,'GetSe',false,'Params',BetaHat(1:(end-2)),...
-            'Ovlap',ovlap,'Period',period,'NumLags',nlag,'Constrained',constrained);
+        'xDates',xDates,'Display',false,'GetSe',getse,'Params',BetaHat(1:(end-2)),...
+            'Ovlap',ovlap,'Period',period,'NumLags',nlag,'Constrained',constrained,'Beta2Para',beta2para);
 end
     y = VaRoutput.yLowFreq;
     yDates = VaRoutput.yDates;
@@ -220,10 +223,10 @@ end
 % Optimization procedures
     fprintf('Estimating univariate MIDAS estimate to get initial parameters\n');
     if submodel == 1
-    [ThresholdParams,CondQthreshold,VaRoutput] = MidasQuantile(y,'Dates',yDates','X',Regressor,'Quantile',threshold,'Display',false,'GetSe',false,...
+    [ThresholdParams,CondQthreshold,VaRoutput] = MidasQuantile(y,'Dates',yDates','X',Regressor,'Quantile',threshold,'Display',false,'Beta2Para',beta2para,'GetSe',getse,...
             'Ovlap',ovlap,'xDates',xDates,'Period',period,'NumLags',nlag,'DoParallel',doparallel,'Cores',cores,'Constrained',constrained,'startPars',startPars);
     else
-    [ThresholdParams,CondQthreshold,VaRoutput] = MidasQuantileAS(y,'Dates',yDates','X',Regressor,'Quantile',threshold,'Display',false,'GetSe',false,...
+    [ThresholdParams,CondQthreshold,VaRoutput] = MidasQuantileAS(y,'Dates',yDates','X',Regressor,'Quantile',threshold,'Display',false,'Beta2Para',beta2para,'GetSe',getse,...
             'Ovlap',ovlap,'xDates',xDates,'Period',period,'NumLags',nlag,'DoParallel',doparallel,'Cores',cores,'Constrained',constrained,'startPars',startPars);
     end
 % Start the optimization procedures
