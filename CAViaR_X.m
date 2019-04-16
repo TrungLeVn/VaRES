@@ -474,7 +474,7 @@ if MODEL == 1
    for i = 2:T
        
        % VaR(i) = BETA(1) + BETA(2) * VaR(i-1) + BETA(3) * abs(y(i-1));
-       derivative1(i) = 1 + BETA(2) * derivative1(i-1);
+       derivative1(i) = 1 + BETA(1) * derivative1(i-1);
        derivative2(i) = VaR(i-1) + BETA(2) * derivative2(i-1);
        derivative3(i) = BETA(2) * derivative3(i-1) + abs(y(i-1));
        derivative4(i) = BETA(3) * derivative4(i-1) + X(i-1);

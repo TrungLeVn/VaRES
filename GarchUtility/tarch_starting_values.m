@@ -103,7 +103,7 @@ if isempty(startingvals)
                 end
                 %Beta must also satisfy the same constraints
                 beta=agb(k)-sum(temp_alpha)-0.5*sum(temp_gamma);
-                %Pick omega to match the unconditional
+                % Pick omega to match the unconditional
                 if tarch_type==1
                     omega=mean(abs(data))*(1-alpha*adj_factor-0.5*gamma-beta);
                 else

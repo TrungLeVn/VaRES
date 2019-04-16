@@ -114,7 +114,7 @@ addParameter(parseObj,'xDates',[],@(x)validateattributes(x,{'numeric','cell'},{}
 addParameter(parseObj,'Ovlap',false,@(x)validateattributes(x,{'numeric','logical'},{'binary','nonempty'},callerName));
 addParameter(parseObj,'DoParallel',false,@(x)validateattributes(x,{'numeric','logical'},{'binary','nonempty'},callerName));
 addParameter(parseObj,'Cores',4,@(x)validateattributes(x,{'numeric'},{'scalar','integer','positive'},callerName));
-addParameter(parseObj,'numInitials',5,@(x)validateattributes(x,{'numeric'},{'scalar','integer','positive'},callerName));
+addParameter(parseObj,'numInitials',10,@(x)validateattributes(x,{'numeric'},{'scalar','integer','positive'},callerName));
 addParameter(parseObj,'numInitialsRand',20000,@(x)validateattributes(x,{'numeric'},{'scalar','integer','positive'},callerName));
 addParameter(parseObj,'Beta2Para',false,@(x)validateattributes(x,{'numeric','logical'},{'binary','nonempty'},callerName));
 addParameter(parseObj,'GetSe',true,@(x)validateattributes(x,{'numeric','logical'},{'binary','nonempty'},callerName));

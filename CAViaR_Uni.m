@@ -221,7 +221,7 @@ warning off
         end          
     end
     else
-        for i = 1:size(BestInitialCond,1)
+            for i = 1:size(BestInitialCond,1)
            [Beta(i,:), fval(i,1), exitflag(i,1)] = fminsearch(@(BETA) RQobjectiveFunction(BETA,1, model, y, theta, empiricalQuantile),BestInitialCond(i,:),options);      
         for it = 1:REP
             try
@@ -318,7 +318,7 @@ function output = RQobjectiveFunction(BETA, OUT, MODEL, y, THETA, empiricalQuant
 % *                                                                                                                                      *
 % * Codes for the paper "CAViaR: Conditional Autoregressive Value at Risk by Regression Quantile" by Robert Engle and Simone Manganelli  *
 % *                                                                                                                                      *
-% * By SIMONE MANGANELLI, European Central Bank, Frankfurt am Main.                                                                      *
+% * By SIMONE MANGANELLI, European Central Bank, Frankfurt am Ma.                                                                      *
 % * Created on 15 September, 2000. Last modified 20 February 2002.                                                                       *
 % *                                                                                                                                      *
 % ****************************************************************************************************************************************
@@ -332,24 +332,35 @@ function output = RQobjectiveFunction(BETA, OUT, MODEL, y, THETA, empiricalQuant
 %
 %**********************************************
 % Compute the VaR
-%
+%% Initial Conditions
+T = length(y);
+VaR = zeros(T,1);
+Hit = VaR;
+
+VaR(1) = empiricalQuantile;
+Hit(1) = THETA - (y(1) < VaR(1));
 %********************************************************************************************
 % Model 1: Symmetric Absolute Value.
 %
 if MODEL == 1
-   VaR = SAVloop(BETA,y, empiricalQuantile); 
+
+   VaR = SAVloop(THETA, BETA, y, VaR(1)); % Call the C program to compute the VaR loop.
+   %VaR = SAVloop(BETA,y,VaR(1));
+   Hit = THETA - (y < VaR);
+
+%
 %********************************************************************************************
 % Model 2: Asymmetric Slope.
-else   
-   VaR = ASloop(BETA, y, empiricalQuantile);
+%
+else
+    
+   VaR = ASloop(THETA, BETA, y, VaR(1)); % Call the C program to compute the VaR loop.
+   Hit = THETA - (y < VaR);
 end
 
-Hit = THETA - (y <= VaR);
-% Compute the Regression Quantile criterion.
-%
 RQ  = Hit'*(y - VaR);
 
-if isinf(RQ) || (RQ ~= RQ) || ~isreal(RQ)
+if RQ == Inf || (RQ ~= RQ) || ~isreal(RQ)
    RQ = 1e+100;
 end
 %
@@ -367,32 +378,32 @@ end
 %----------------------------------------------------------------
 % SAV process function
 
-function q = SAVloop(BETA, y, empiricalQuantile)
+%function q = SAVloop(BETA, y, empiricalQuantile)
 %%
 % Compute the quantile time series for the Symmetric Absolute Value model,
 % given the vector of returns y and the vector of parameters BETA.
 %%
-T = length(y);
-q = zeros(T,1); q(1) = empiricalQuantile;
-for t = 2:T
-    q(t) = BETA(1) + BETA(2) * q(t-1) + BETA(3) * abs(y(t-1));
-end
-end
+%T = length(y);
+%q = zeros(T,1); q(1) = empiricalQuantile;
+%for t = 2:T
+%    q(t) = BETA(1) + BETA(2) * q(t-1) + BETA(3) * abs(y(t-1));
+%end
+%end
 
 %----------------------------------------------------------------
 
 % AS process function
-function q = ASloop(beta, y, empiricalQuantile)
+%function q = ASloop(beta, y, empiricalQuantile)
 %%
 % Compute the quantile time series for the Asymmetric Absolute Value model,
 % given the vector of returns y and the vector of parameters BETA.
 %%
-T = length(y);
-q = zeros(T,1); q(1) = empiricalQuantile;
-for t = 2:T
-    q(t) = beta(1) + beta(2) * q(t-1) + beta(3) * abs(y(t-1)) * (y(t-1)>0) +  beta(4) * abs(y(t-1)) * (y(t-1)<=0);
-end
-end
+%T = length(y);
+%q = zeros(T,1); q(1) = empiricalQuantile;
+%for t = 2:T
+%    q(t) = beta(1) + beta(2) * q(t-1) + beta(3) * abs(y(t-1)) * (y(t-1)>0) +  beta(4) * abs(y(t-1)) * (y(t-1)<=0);
+%end
+%end
 
 %------------------------------------------------------------------
 % VarCov function
@@ -454,9 +465,9 @@ if MODEL == 1
    for i = 2:T
        
        % VaR(i) = BETA(1) + BETA(2) * VaR(i-1) + BETA(3) * abs(y(i-1));
-       derivative1(i) = 1 + BETA(2) * derivative1(i-1);
+       derivative1(i) = 1 + BETA(1) * derivative1(i-1);
        derivative2(i) = VaR(i-1) + BETA(2) * derivative2(i-1);
-       derivative3(i) = BETA(2) * derivative3(i-1) + abs(y(i-1));
+       derivative3(i) = BETA(3) * derivative3(i-1) + abs(y(i-1));
        
        gradient(i,:) = [derivative1(i), derivative2(i), derivative3(i)];   
        A = A + gradient(i,:)'*gradient(i,:);
@@ -476,7 +487,7 @@ else
     for i = 2:T
 
         % VaR(i) = BETA(1) + BETA(2) * VaR(i-1) + BETA(3) * y(i-1) * (y(i-1)>0) - BETA(4) * y(i-1) * (y(i-1)<0);
-        derivative1(i) = 1 + BETA(2)*derivative1(i-1);
+        derivative1(i) = 1 + BETA(1)*derivative1(i-1);
         derivative2(i) = VaR(i-1) + BETA(2)*derivative2(i-1);
         derivative3(i) = BETA(3)*derivative3(i-1) + y(i-1)*(y(i-1)>0);
         derivative4(i) = BETA(4)*derivative4(i-1) - y(i-1)*(y(i-1)<0);

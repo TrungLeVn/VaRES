@@ -113,7 +113,7 @@ addParameter(parseObj,'Ovlap',false,@(x)validateattributes(x,{'numeric','logical
 addParameter(parseObj,'DoParallel',false,@(x)validateattributes(x,{'numeric','logical'},{'binary','nonempty'},callerName));
 addParameter(parseObj,'Cores',4,@(x)validateattributes(x,{'numeric'},{'scalar','integer','positive'},callerName));
 addParameter(parseObj,'numInitials',10,@(x)validateattributes(x,{'numeric'},{'scalar','integer','positive'},callerName));
-addParameter(parseObj,'numInitialsRand',20000,@(x)validateattributes(x,{'numeric'},{'scalar','integer','positive'},callerName));
+addParameter(parseObj,'numInitialsRand',10000,@(x)validateattributes(x,{'numeric'},{'scalar','integer','positive'},callerName));
 addParameter(parseObj,'Beta2Para',false,@(x)validateattributes(x,{'numeric','logical'},{'binary','nonempty'},callerName));
 addParameter(parseObj,'GetSe',true,@(x)validateattributes(x,{'numeric','logical'},{'binary','nonempty'},callerName));
 addParameter(parseObj,'Display',true,@(x)validateattributes(x,{'numeric','logical'},{'binary','nonempty'},callerName));
@@ -218,7 +218,9 @@ end
 % Optimazation procedues
 if isempty(startPars)
 fprintf('Finding the initial Betas... \n');
+tic
 betaIni = GetIniParams(yLowFreq, xHighFreq, q, nlag, beta2para,numInitialsRand,numInitials,doparallel);
+toc
 else
 betaIni = startPars';
 end
@@ -320,13 +322,13 @@ exitFlag = SortedFval(1,2);
 if getse
 fprintf('Getting standard errors... \n');
 nsim = 200;
-resid = (yLowFreq - condQuantile);
+resid = (yLowFreq - condQuantile)./(abs(condQuantile));
 paramSim = zeros(length(estParams),nsim);
 if doparallel
 parfor r = 1:nsim
     ind = randi(nobsEst,[nobsEst,1]);
     residSim = resid(ind);
-    yLowFreqSim = condQuantile + resid(ind);
+    yLowFreqSim = condQuantile + resid(ind) .* abs(condQuantile);
    % [yLowFreqSim,~] = GetSim(estParams,xHighFreq,beta2para,residSim);
     paramSim(:,r) = fminsearch(@(params) objFun(params,yLowFreqSim,xHighFreq,q,beta2para),estParams,options);
 end
@@ -335,7 +337,7 @@ for r = 1:nsim
     ind = randi(nobsEst,[nobsEst,1]);
     residSim = resid(ind); 
     %xHighFreqSim = xHighFreq(ind,:);
-    yLowFreqSim = condQuantile + resid(ind);
+    yLowFreqSim = condQuantile + resid(ind) .* abs(condQuantile);
    % [yLowFreqSim,~] = GetSim(estParams,xHighFreq,beta2para,residSim);
       paramSim(:,r) = fminsearch(@(params) objFun(params,yLowFreqSim,xHighFreq,q,beta2para),estParams,options);
 end
@@ -405,6 +407,7 @@ output.beta2para = beta2para;
 output.horizon = period;
 output.yDates = yDates; 
 output.xDates = xDates;
+output.BetaIni = betaIni;
 if beta2para
 output.weights = estParams(2) * midasBetaWeights(nlag,estParams(3),estParams(4));
 else

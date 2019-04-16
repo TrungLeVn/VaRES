@@ -351,6 +351,8 @@ output.Regressor = Regressor;
 output.xDates = xDates;
 if isempty(startPars)
 output.QuantEst = QuantEst;
+output.empiricalQuantile = empiricalQuantile;
+output.condMean = mu;
 end
 end
 %%
